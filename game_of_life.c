@@ -19,15 +19,18 @@ typedef struct dummy_packet{
 } packet;
 
 static void print_grid(int grid[N][N]);
+static void send(int i, int j);
+static void recv(int i, int j);
+
+int proc[N][N];
+int grid[N][N];
+int sums[N][N];	
 
 int main(int argc, char *argv[]) {
 
   int num_procs, rank, to_rank, from_rank, tag;
 	int i, j, k, iter; 
 	int buffer[MAX_BUFFER];
-	int proc[N][N];
-	int grid[N][N];
-	int sums[N][N];
 	MPI_Status status;
 	packet temp_pack;
 	packet *ptr_pack;
@@ -107,5 +110,13 @@ void print_grid(int grid[N][N]) {
 		}
 		printf("\n");
 	}
+
+}
+
+void send(int i, int j) {
+
+}
+
+void recv(int i, int j) {
 
 }
