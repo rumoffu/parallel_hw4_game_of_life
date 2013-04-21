@@ -11,6 +11,8 @@ HW 4 game_of_life.c
 #define MAX_BUFFER 500
 #define N 16
 #define NEIGHBORS 8
+#define UPDATE_TYPE 2
+#define PRINT_TYPE 3
 
 typedef struct dummy_packet{
         int type;
@@ -67,17 +69,15 @@ int main(int argc, char *argv[]) {
 	{
 		for(j = 0; j < N; j++)
 		{
-			if(proc[i][j] == rank)
-			{//responsible for this cell
-printf("[%d][%d]:\n", i, j);
-				calc_neighbors(i, j, neighbors);
-				for(k = 0; k < NEIGHBORS; k++)
-				{//for each neighbor
-printf("%d ", neighbors[k]);
-if(k+1 == NEIGHBORS)
-printf("\n");
-					if(neighbors[k] == rank)
-					{//no need to send/recv
+			to_rank = proc[i][j];
+			calc_neighbors(i, j, neighbors);
+			for(k = 0; k < NEIGHBORS; k++)
+			{//for each neighbor
+				from_rank = neighbors[k];
+				if(to_rank == rank)
+				{//I am responsible for updating this cell
+					if(from_rank == rank)
+					{//I do to/from for this neighbor's data - so no send/recv
 						if(k == 0)
 						{	sums[i][j] += grid[(i-1+N) % N][(j-1+N) % N];}
 						else if(k == 1)
@@ -95,36 +95,47 @@ printf("\n");
 						else if(k == 7)
 						{	sums[i][j] += grid[(i+1+N) % N][(j+1+N) % N];}
 					}
-					else //must send and recv to other process
-					{//send and recv
-						//TopMid, BotMid, MidLeft, MidRight
-						if((i+j) % 2 == 0)
-						{//even so send first
-							send_plus(i, j, neighbors);
-							recv_plus(i, j, neighbors);
-						}
-						else
-						{//odd so recv first
-							recv_plus(i, j, neighbors);
-							send_plus(i, j, neighbors);
-						}
-						//TopLeft, TopRight, BotLeft, BotRight
-						if(i % 2 == 0)
-						{//even so send first
-							send_diag(i, j, neighbors);
-							recv_diag(i, j, neighbors);
-						}
-						else
-						{//odd so recv first
-							recv_diag(i, j, neighbors);
-							send_diag(i, j, neighbors);
-						}
+					else //neighbor data must come from another proc
+					{ //receive the data and process
+						MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
+						sums[i][j] += temp_pack.value; //maybe if out of synch [temp_pack.i] [temp_pack.j]
 					}
-				}		
-			}
+				}
+				else //not responsible for the cell itself
+				{
+					if(from_rank == rank)
+					{ //I am responsible for this neighbor's data so need to send
+						temp_pack.type = UPDATE_TYPE;
+						temp_pack.i = i; //for cell at i
+						temp_pack.j = j; //for cell at j
+						if(k == 0)
+						{	temp_pack.value = grid[(i-1+N) % N][(j-1+N) % N];}
+						else if(k == 1)
+						{	temp_pack.value = grid[(i-1+N) % N][j];}
+						else if(k == 2)
+						{	temp_pack.value = grid[(i-1+N) % N][(j+1+N) % N];}
+						else if(k == 3)
+						{	temp_pack.value = grid[i][(j-1+N) % N];}
+						else if(k == 4)
+						{	temp_pack.value = grid[i][(j+1+N) % N];}
+						else if(k == 5)
+						{	temp_pack.value = grid[(i+1+N) % N][(j-1+N) % N];}
+						else if(k == 6)
+						{	temp_pack.value = grid[(i+1+N) % N][j];}
+						else if(k == 7)
+						{	temp_pack.value = grid[(i+1+N) % N][(j+1+N) % N];}
+						MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
+					}
+				}
+			}		
 		}
 	}
-/*
+	if(rank ==0)
+	{
+		printf("Iteration #%d\n", iter++);
+		print_grid(sums);
+	}
+/*	
 	temp_pack.type = 1;
 	temp_pack.i = 2;
 	temp_pack.j = 3;
