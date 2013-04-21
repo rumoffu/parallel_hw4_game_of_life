@@ -10,6 +10,7 @@ HW 4 game_of_life.c
 
 #define MAX_BUFFER 500
 #define N 16
+#define NEIGHBORS 8
 
 typedef struct dummy_packet{
         int type;
@@ -19,18 +20,21 @@ typedef struct dummy_packet{
 } packet;
 
 static void print_grid(int grid[N][N]);
-static void send(int i, int j);
-static void recv(int i, int j);
+static void send_plus(int i, int j, int ra[]);
+static void recv_plus(int i, int j, int ra[]);
+static void send_diag(int i, int j, int ra[]);
+static void recv_diag(int i, int j, int ra[]);
+static void calc_neighbors(int i, int j, int ra[]);
 
 int proc[N][N];
 int grid[N][N];
 int sums[N][N];	
+int num_procs, rank, to_rank, from_rank, tag;
 
 int main(int argc, char *argv[]) {
-
-  int num_procs, rank, to_rank, from_rank, tag;
+	int toi, toj;
 	int i, j, k, iter; 
-	int buffer[MAX_BUFFER];
+	int neighbors[NEIGHBORS];
 	MPI_Status status;
 	packet temp_pack;
 	packet *ptr_pack;
@@ -57,27 +61,76 @@ int main(int argc, char *argv[]) {
 	grid[2][1] = 1;
 	grid[2][2] = 1;
 	iter = 0;
+	tag = 123;
 
 	for(i = 0; i < N; i++)
 	{
 		for(j = 0; j < N; j++)
 		{
 			if(proc[i][j] == rank)
-			{
-				if((i+j) % 2 == 0) 
-				{
-				}
+			{//responsible for this cell
+printf("[%d][%d]:\n", i, j);
+				calc_neighbors(i, j, neighbors);
+				for(k = 0; k < NEIGHBORS; k++)
+				{//for each neighbor
+printf("%d ", neighbors[k]);
+if(k+1 == NEIGHBORS)
+printf("\n");
+					if(neighbors[k] == rank)
+					{//no need to send/recv
+						if(k == 0)
+						{	sums[i][j] += grid[(i-1+N) % N][(j-1+N) % N];}
+						else if(k == 1)
+						{	sums[i][j] += grid[(i-1+N) % N][j];}
+						else if(k == 2)
+						{	sums[i][j] += grid[(i-1+N) % N][(j+1+N) % N];}
+						else if(k == 3)
+						{	sums[i][j] += grid[i][(j-1+N) % N];}
+						else if(k == 4)
+						{	sums[i][j] += grid[i][(j+1+N) % N];}
+						else if(k == 5)
+						{	sums[i][j] += grid[(i+1+N) % N][(j-1+N) % N];}
+						else if(k == 6)
+						{	sums[i][j] += grid[(i+1+N) % N][j];}
+						else if(k == 7)
+						{	sums[i][j] += grid[(i+1+N) % N][(j+1+N) % N];}
+					}
+					else //must send and recv to other process
+					{//send and recv
+						//TopMid, BotMid, MidLeft, MidRight
+						if((i+j) % 2 == 0)
+						{//even so send first
+							send_plus(i, j, neighbors);
+							recv_plus(i, j, neighbors);
+						}
+						else
+						{//odd so recv first
+							recv_plus(i, j, neighbors);
+							send_plus(i, j, neighbors);
+						}
+						//TopLeft, TopRight, BotLeft, BotRight
+						if(i % 2 == 0)
+						{//even so send first
+							send_diag(i, j, neighbors);
+							recv_diag(i, j, neighbors);
+						}
+						else
+						{//odd so recv first
+							recv_diag(i, j, neighbors);
+							send_diag(i, j, neighbors);
+						}
+					}
+				}		
 			}
 		}
 	}
-
+/*
 	temp_pack.type = 1;
 	temp_pack.i = 2;
 	temp_pack.j = 3;
 	temp_pack.value = 4;
 	to_rank = 1;
 	from_rank = 0;
-	tag = 123;
 
 	if(rank == 0)
 	{
@@ -94,7 +147,7 @@ int main(int argc, char *argv[]) {
 		printf("pack.j = %d\n", ptr_pack->j);
 		printf("pack.value = %d\n", ptr_pack->value);
 	}
-
+*/
 	MPI_Finalize();
 	return 0;
 }
@@ -113,10 +166,31 @@ void print_grid(int grid[N][N]) {
 
 }
 
-void send(int i, int j) {
+void send_plus(int i, int j, int ra[]) {
 
 }
 
-void recv(int i, int j) {
+void recv_plus(int i, int j, int ra[]) {
 
 }
+
+void send_diag(int i, int j, int ra[]) {
+
+}
+
+void recv_diag(int i, int j, int ra[]) {
+
+}
+
+void calc_neighbors(int i, int j, int ra[]) {
+	
+	ra[0] = proc[(i-1+N) % N][(j-1+N) % N];
+	ra[1] = proc[(i-1+N) % N][j];
+	ra[2] = proc[(i-1+N) % N][(j+1+N) % N];
+	ra[3] = proc[i][(j-1+N) % N];
+	ra[4] = proc[i][(j+1+N) % N];
+	ra[5] = proc[(i+1+N) % N][(j-1+N) % N];
+	ra[6] = proc[(i+1+N) % N][j];
+	ra[7] = proc[(i+1+N) % N][(j+1+N) % N];
+}
+
