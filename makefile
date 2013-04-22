@@ -3,14 +3,14 @@ MPICC	= mpicc
 # uncomment to build all when make file changes
 #SPECDEP=makefile
 
-TARGETS = game_of_life
+TARGETS = gameoflife
 
 all : $(TARGETS)
 	@echo Make Complete
 
-game_of_life : game_of_life.c $(SPECDEP)
-	$(MPICC) game_of_life.c -o game_of_life
+gameoflife : gameoflife.c $(SPECDEP)
+	$(MPICC) gameoflife.c -o gameoflife
 
 clean :
-	rm game_of_life
+	rm gameoflife
 	@echo Makeclean Complete
