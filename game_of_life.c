@@ -13,6 +13,7 @@ HW 4 game_of_life.c
 #define NEIGHBORS 8
 #define UPDATE_TYPE 2
 #define PRINT_TYPE 3
+#define NUM_ITERATIONS 64
 
 typedef struct dummy_packet{
         int type;
@@ -35,7 +36,7 @@ int num_procs, rank, to_rank, from_rank, tag;
 
 int main(int argc, char *argv[]) {
 	int toi, toj;
-	int i, j, k, iter; 
+	int h, i, j, k, iter; 
 	int neighbors[NEIGHBORS];
 	MPI_Status status;
 	packet temp_pack;
@@ -66,127 +67,129 @@ int main(int argc, char *argv[]) {
 	tag = 123;
 	if(rank == 0)
 	{
-		printf("Iteration #%d\n", iter++);
+		printf("Initial setup:\n");
 		print_grid(grid);
 	}
 	//for loop to do 64 iterations
-	for(i = 0; i < N; i++)
+	for(h = 0; h < NUM_ITERATIONS; h++)
 	{
-		for(j = 0; j < N; j++)
+		for(i = 0; i < N; i++)
 		{
-			to_rank = proc[i][j];
-			calc_neighbors(i, j, neighbors);
-			for(k = 0; k < NEIGHBORS; k++)
-			{//for each neighbor
-				from_rank = neighbors[k];
-				if(to_rank == rank)
-				{//I am responsible for updating this cell
-					if(from_rank == rank)
-					{//I do to/from for this neighbor's data - so no send/recv
-						if(k == 0)
-						{	sums[i][j] += grid[(i-1+N) % N][(j-1+N) % N];}
-						else if(k == 1)
-						{	sums[i][j] += grid[(i-1+N) % N][j];}
-						else if(k == 2)
-						{	sums[i][j] += grid[(i-1+N) % N][(j+1+N) % N];}
-						else if(k == 3)
-						{	sums[i][j] += grid[i][(j-1+N) % N];}
-						else if(k == 4)
-						{	sums[i][j] += grid[i][(j+1+N) % N];}
-						else if(k == 5)
-						{	sums[i][j] += grid[(i+1+N) % N][(j-1+N) % N];}
-						else if(k == 6)
-						{	sums[i][j] += grid[(i+1+N) % N][j];}
-						else if(k == 7)
-						{	sums[i][j] += grid[(i+1+N) % N][(j+1+N) % N];}
+			for(j = 0; j < N; j++)
+			{
+				sums[i][j] = 0;//reset sums each round
+				to_rank = proc[i][j];
+				calc_neighbors(i, j, neighbors);
+				for(k = 0; k < NEIGHBORS; k++)
+				{//for each neighbor
+					from_rank = neighbors[k];
+					if(to_rank == rank)
+					{//I am responsible for updating this cell
+						if(from_rank == rank)
+						{//I do to/from for this neighbor's data - so no send/recv
+							if(k == 0)
+							{	sums[i][j] += grid[(i-1+N) % N][(j-1+N) % N];}
+							else if(k == 1)
+							{	sums[i][j] += grid[(i-1+N) % N][j];}
+							else if(k == 2)
+							{	sums[i][j] += grid[(i-1+N) % N][(j+1+N) % N];}
+							else if(k == 3)
+							{	sums[i][j] += grid[i][(j-1+N) % N];}
+							else if(k == 4)
+							{	sums[i][j] += grid[i][(j+1+N) % N];}
+							else if(k == 5)
+							{	sums[i][j] += grid[(i+1+N) % N][(j-1+N) % N];}
+							else if(k == 6)
+							{	sums[i][j] += grid[(i+1+N) % N][j];}
+							else if(k == 7)
+							{	sums[i][j] += grid[(i+1+N) % N][(j+1+N) % N];}
+						}
+						else //neighbor data must come from another proc
+						{ //receive the data and process
+							MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
+							sums[i][j] += temp_pack.value; //maybe if out of synch [temp_pack.i] [temp_pack.j]
+//printf	("Received value: %d from_rank: %d\n", temp_pack.value, from_rank);
+						}
 					}
-					else //neighbor data must come from another proc
-					{ //receive the data and process
-						MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
-						sums[i][j] += temp_pack.value; //maybe if out of synch [temp_pack.i] [temp_pack.j]
-//printf("Received value: %d from_rank: %d\n", temp_pack.value, from_rank);
+					else //not responsible for the cell itself
+					{
+						if(from_rank == rank)
+						{ //I am responsible for this neighbor's data so need to send
+							temp_pack.type = UPDATE_TYPE;
+							temp_pack.i = i; //for cell at i
+							temp_pack.j = j; //for cell at j
+							if(k == 0)
+							{	temp_pack.value = grid[(i-1+N) % N][(j-1+N) % N];}
+							else if(k == 1)
+							{	temp_pack.value = grid[(i-1+N) % N][j];}
+							else if(k == 2)
+							{	temp_pack.value = grid[(i-1+N) % N][(j+1+N) % N];}
+							else if(k == 3)
+							{	temp_pack.value = grid[i][(j-1+N) % N];}
+							else if(k == 4)
+							{	temp_pack.value = grid[i][(j+1+N) % N];}
+							else if(k == 5)
+							{	temp_pack.value = grid[(i+1+N) % N][(j-1+N) % N];}
+							else if(k == 6)
+							{	temp_pack.value = grid[(i+1+N) % N][j];}
+							else if(k == 7)
+							{	temp_pack.value = grid[(i+1+N) % N][(j+1+N) % N];}
+							MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
+						}
 					}
 				}
-				else //not responsible for the cell itself
-				{
-					if(from_rank == rank)
-					{ //I am responsible for this neighbor's data so need to send
-						temp_pack.type = UPDATE_TYPE;
-						temp_pack.i = i; //for cell at i
-						temp_pack.j = j; //for cell at j
-						if(k == 0)
-						{	temp_pack.value = grid[(i-1+N) % N][(j-1+N) % N];}
-						else if(k == 1)
-						{	temp_pack.value = grid[(i-1+N) % N][j];}
-						else if(k == 2)
-						{	temp_pack.value = grid[(i-1+N) % N][(j+1+N) % N];}
-						else if(k == 3)
-						{	temp_pack.value = grid[i][(j-1+N) % N];}
-						else if(k == 4)
-						{	temp_pack.value = grid[i][(j+1+N) % N];}
-						else if(k == 5)
-						{	temp_pack.value = grid[(i+1+N) % N][(j-1+N) % N];}
-						else if(k == 6)
-						{	temp_pack.value = grid[(i+1+N) % N][j];}
-						else if(k == 7)
-						{	temp_pack.value = grid[(i+1+N) % N][(j+1+N) % N];}
+			}
+		}
+		//update the grid and send if needed
+		for(i = 0; i < N; i++)
+		{
+			for(j = 0; j < N; j++)
+			{
+				if(proc[i][j] == rank)		
+				{//I am to update this cell
+					if(grid[i][j] == 1)//was alive
+					{
+						if(sums[i][j] < 2 || sums[i][j] > 3)
+						{
+							grid[i][j] = 0; //die lonely or overcrowding
+						}
+					}
+					else //was dead
+					{
+						if(sums[i][j] == 3)
+						{//born from 3 neighbors
+							grid[i][j] = 1;
+						}
+					}
+					if(rank != 0)//need to send update to process 0
+					{
+						temp_pack.type = PRINT_TYPE;
+						temp_pack.i = i;
+						temp_pack.j = j;
+						temp_pack.value = grid[i][j];
+						to_rank = 0;
 						MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
 					}
 				}
-			}
-		}
-	}
-	//update the grid and send if needed
-	for(i = 0; i < N; i++)
-	{
-		for(j = 0; j < N; j++)
-		{
-			if(proc[i][j] == rank)		
-			{//I am to update this cell
-				if(grid[i][j] == 1)//was alive
+				from_rank = proc[i][j];
+				if(from_rank != 0) //process 0 must receive
 				{
-					if(sums[i][j] < 2 || sums[i][j] > 3)
+					if(rank == 0)//I am process 0
 					{
-						grid[i][j] = 0; //die lonely or overcrowding
+						MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
+						grid[i][j] = temp_pack.value;
 					}
-				}
-				else //was dead
-				{
-					if(sums[i][j] == 3)
-					{//born from 3 neighbors
-						grid[i][j] = 1;
-					}
-				}
-				if(rank != 0)//need to send update to process 0
-				{
-					temp_pack.type = PRINT_TYPE;
-					temp_pack.i = i;
-					temp_pack.j = j;
-					temp_pack.value = grid[i][j];
-					to_rank = 0;
-					MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
-				}
-			}
-			from_rank = proc[i][j];
-			if(from_rank != 0) //process 0 must receive
-			{
-				if(rank == 0)//I am process 0
-				{
-					MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
-					grid[i][j] = temp_pack.value;
 				}
 			}
 		}
-	}
 
-	if(rank ==0)
-	{
-		printf("sums\n");
-		print_grid(sums);
-		printf("Iteration #%d\n", iter++);
-		print_grid(grid);
+		if(rank ==0)
+		{
+			printf("Iteration %d:\n", iter++);
+			print_grid(grid);
+		}
 	}
-/*	
+/*		
 	temp_pack.type = 1;
 	temp_pack.i = 2;
 	temp_pack.j = 3;
