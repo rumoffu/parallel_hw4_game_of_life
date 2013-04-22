@@ -43,6 +43,15 @@ int main(int argc, char *argv[]) {
 	}
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	if(N % num_procs != 0)
+	{
+		if(rank == 0)
+		{
+			printf("Error - only meant to use 1, 2, 4, 8, or 16 processors. Exiting\n");
+		}
+		MPI_Finalize();
+		return 1;
+	}
 	k = 0;
 	for(i = 0; i < N; i++)
 	{
