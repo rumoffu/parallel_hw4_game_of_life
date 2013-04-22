@@ -23,10 +23,6 @@ typedef struct dummy_packet{
 } packet;
 
 static void print_grid(int grid[N][N]);
-static void send_plus(int i, int j, int ra[]);
-static void recv_plus(int i, int j, int ra[]);
-static void send_diag(int i, int j, int ra[]);
-static void recv_diag(int i, int j, int ra[]);
 static void calc_neighbors(int i, int j, int ra[]);
 
 int proc[N][N];
@@ -108,7 +104,6 @@ int main(int argc, char *argv[]) {
 						{ //receive the data and process
 							MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
 							sums[i][j] += temp_pack.value; //maybe if out of synch [temp_pack.i] [temp_pack.j]
-//printf	("Received value: %d from_rank: %d\n", temp_pack.value, from_rank);
 						}
 					}
 					else //not responsible for the cell itself
@@ -189,30 +184,6 @@ int main(int argc, char *argv[]) {
 			print_grid(grid);
 		}
 	}
-/*		
-	temp_pack.type = 1;
-	temp_pack.i = 2;
-	temp_pack.j = 3;
-	temp_pack.value = 4;
-	to_rank = 1;
-	from_rank = 0;
-
-	if(rank == 0)
-	{
-		MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
-		iter = 1;
-		printf("Printing grid iteration %d\n", iter++);
-		print_grid(grid);
-	}
-	if(rank == 1)
-	{
-		MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
-		ptr_pack = &temp_pack;
-		printf("pack.i = %d\n", ptr_pack->i);
-		printf("pack.j = %d\n", ptr_pack->j);
-		printf("pack.value = %d\n", ptr_pack->value);
-	}
-*/
 	MPI_Finalize();
 	return 0;
 }
@@ -228,22 +199,6 @@ void print_grid(int grid[N][N]) {
 		}
 		printf("\n");
 	}
-
-}
-
-void send_plus(int i, int j, int ra[]) {
-
-}
-
-void recv_plus(int i, int j, int ra[]) {
-
-}
-
-void send_diag(int i, int j, int ra[]) {
-
-}
-
-void recv_diag(int i, int j, int ra[]) {
 
 }
 
