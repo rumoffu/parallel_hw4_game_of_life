@@ -64,7 +64,12 @@ int main(int argc, char *argv[]) {
 	grid[2][2] = 1;
 	iter = 0;
 	tag = 123;
-
+	if(rank == 0)
+	{
+		printf("Iteration #%d\n", iter++);
+		print_grid(grid);
+	}
+	//for loop to do 64 iterations
 	for(i = 0; i < N; i++)
 	{
 		for(j = 0; j < N; j++)
@@ -99,6 +104,7 @@ int main(int argc, char *argv[]) {
 					{ //receive the data and process
 						MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
 						sums[i][j] += temp_pack.value; //maybe if out of synch [temp_pack.i] [temp_pack.j]
+//printf("Received value: %d from_rank: %d\n", temp_pack.value, from_rank);
 					}
 				}
 				else //not responsible for the cell itself
@@ -127,13 +133,58 @@ int main(int argc, char *argv[]) {
 						MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
 					}
 				}
-			}		
+			}
 		}
 	}
+	//update the grid and send if needed
+	for(i = 0; i < N; i++)
+	{
+		for(j = 0; j < N; j++)
+		{
+			if(proc[i][j] == rank)		
+			{//I am to update this cell
+				if(grid[i][j] == 1)//was alive
+				{
+					if(sums[i][j] < 2 || sums[i][j] > 3)
+					{
+						grid[i][j] = 0; //die lonely or overcrowding
+					}
+				}
+				else //was dead
+				{
+					if(sums[i][j] == 3)
+					{//born from 3 neighbors
+						grid[i][j] = 1;
+					}
+				}
+				if(rank != 0)//need to send update to process 0
+				{
+					temp_pack.type = PRINT_TYPE;
+					temp_pack.i = i;
+					temp_pack.j = j;
+					temp_pack.value = grid[i][j];
+					to_rank = 0;
+					MPI_Ssend(&temp_pack, sizeof(packet), MPI_BYTE, to_rank, tag, MPI_COMM_WORLD);
+				}
+			}
+			from_rank = proc[i][j];
+			if(from_rank != 0) //process 0 must receive
+			{
+				if(rank == 0)//I am process 0
+				{
+					MPI_Recv(&temp_pack, sizeof(packet), MPI_BYTE, from_rank, tag, MPI_COMM_WORLD, &status);
+					grid[i][j] = temp_pack.value;
+				}
+			}
+		}
+	}
+
 	if(rank ==0)
 	{
-		printf("Iteration #%d\n", iter++);
+		printf("sums\n");
 		print_grid(sums);
+		printf("Iteration #%d\n", iter++);
+		print_grid(grid);
 	}
 /*	
 	temp_pack.type = 1;
